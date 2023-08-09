@@ -25,4 +25,4 @@ Use **raw data** to clean rows then use 50% threshold to clean columns. Please b
 For detailed running instructions, please follow markdowns in **"NYC Vehicle Accident Investigation - Person.Rmd"** file. For a results report including visualizations without running code, check out **"NYC-Vehicle-Accident-Investigation---Person.pdf"**.  
   
 ## Visualization
-Check **"NYC-Vehicle-Accident-Investigation---Person.pdf"** for Person visualization.
+Check out **"NYC-Vehicle-Accident-Investigation---Person.pdf"** for Person visualization.
