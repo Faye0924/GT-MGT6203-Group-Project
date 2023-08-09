@@ -1,0 +1,490 @@
+---
+title: "NYC Vehicle Accident Investigation - Person"
+author: "Team41 - Xufei Lang"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data
+
+### Data Source
+The Motor Vehicle Collisions Person table contains details for people involved in the crash. Each row represents a person (driver, occupant, pedestrian, bicyclist,..) involved in a crash. Data goes back to Jan 2013, and downloaded on 6/15/2023. https://catalog.data.gov/dataset/motor-vehicle-collisions-person. Raw data has 5056441 rows, 21 columns, 840.5 Mb.
+
+Note: data updated regularly on DATA.GOV website, so if use the newer version of data, results might be a little different from the report. 
+
+### Data Cleaning
+Load relevant packages. 
+```{r, warning=FALSE, results='hide', message=FALSE}
+
+# clean environment. 
+rm(list=ls())
+
+# install packages. 
+if (!require("dplyr")) install.packages("dplyr")
+if (!require("tidyr")) install.packages("tidyr")
+if (!(require("ggplot2"))) install.packages("ggplot2")
+if (!(require("stringr"))) install.packages("stringr")
+if (!(require("caret"))) install.packages("caret")
+if (!(require("car"))) install.packages("car")
+if (!(require("ROCR"))) install.packages("ROCR")
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+library(caret)
+library(car)
+library(ROCR)
+
+```
+
+**Warning**: the following 3 code chunks should only run once for generating/exporting cleaned dataset to a csv file. Remember to set working directory, loaded data path/name, exported file path/name. This process might take a few minutes considering the data size, please be patient. Thanks!
+```{r, warning=FALSE, message=FALSE}
+
+# set working directory.
+setwd("/Users/mingzeli0924/Documents/STUDY/OMSA/Courses/MGT6203 - Data Analytics in Business/Group Project/data")
+
+# load in person raw dataset. updated 6/15/2023. 
+df <- read.csv("20230615 downloaded raw data/Motor_Vehicle_Collisions_-_Person (2).csv")
+head(df)
+glimpse(df)
+
+```
+
+Clean dataset, remove unnecessary rows & columns.
+```{r}
+
+# remove rows with PED_ROL in "Registrant", "Notified Person", "Witness", "Policy Holder", "Owner", those are people not directly involved in the accidents.
+person <- df %>%
+  filter(!(PED_ROLE %in% c("Registrant", "Notified Person", "Witness", "Policy Holder", "Owner")))
+
+# check the percentage of missing values in each column. 
+person_check <- person %>% 
+  summarize(across(everything(), ~ sum(. == ""))) %>%
+  pivot_longer(everything(), names_to = "Column", values_to = "Count") %>%
+  mutate("Percentage(%)" = round(Count / nrow(person) * 100, 2)) %>%
+  arrange(desc(Count))
+person_check
+
+# use a threshold of 50% to remove columns. 
+person <- person %>%
+  select(!c("CONTRIBUTING_FACTOR_2", "CONTRIBUTING_FACTOR_1", "PED_ACTION", "PED_LOCATION"))
+glimpse(person)  # this is the cleaned dataset.
+
+```
+
+Set exported file path/name.
+```{r, warning=FALSE, message=FALSE}
+
+# export to a csv file.
+setwd("/Users/mingzeli0924/Documents/STUDY/OMSA/Courses/MGT6203 - Data Analytics in Business/Group Project/data")
+write.csv(person, file="Motor_Vehicle_Collisions - Person_clean.csv")
+
+```
+**Warning**: the above 3 code chunks should only run once for generating/exporting cleaned dataset to a csv file. Load in csv raw data several times could crash the system. For further analysis, either use the person dataframe generated from above code, or load in Person_clean.csv file using the next code chunk. 
+
+### Data Exploring
+
+Load in Person_clean.csv file only when something goes wrong in further analysis and reload data is necessary. If so, skip above cleaning process and start from loading in cleaned dataset. Otherwise, skip this part. 
+```{r, warning=FALSE, message=FALSE}
+
+# load cleaned person data.
+setwd("/Users/mingzeli0924/Documents/STUDY/OMSA/Courses/MGT6203 - Data Analytics in Business/Group Project/data")
+person <- read.csv("Motor_Vehicle_Collisions - Person_clean.csv")
+person <- person[, -1]
+
+```
+
+#### Histograms for the following categorical columns:
+"PERSON_TYPE"  "PERSON_INJURY"  "EJECTION"  "EMOTIONAL_STATUS"  "BODILY_INJURY" 
+"POSITION_IN_VEHICLE"  "SAFETY_EQUIPMENT"  "COMPLAINT"  "PED_ROLE"  "PERSON_SEX"
+```{r, warning=FALSE, results='hide', message=FALSE}
+
+# create a plot function to show histogram for column. 
+plot_fun <- function(df,x) {
+  # create dataframe for the column with unique value counts.
+  title <- x
+  x <- df[,x]
+  x_count <- df %>%
+    mutate(x = as.factor(x)) %>%
+    #filter(!(x %in% c("Does Not Apply", "", "-", "Unknown", "U"))) %>%
+    count(x) %>%
+    mutate(Percentage = round(n/sum(n) * 100, 2))
+  
+  # bar plot.
+  ggplot(x_count, aes(x = str_wrap(x, width=40), y = Percentage, fill = x)) +
+    geom_bar(stat = "identity") +
+    labs(x = "Value", y = "Percentage", fill = "Value") +
+    scale_fill_discrete(name = "Value") +
+    theme_minimal() + 
+    scale_x_discrete(labels = function(x) str_wrap(x, width = 40)) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, face="bold"), legend.position = "none") +
+    geom_text(aes(label=paste0(Percentage, "%"), vjust = -0.5)) +
+    labs(title=title)  
+}
+
+```
+
+```{r, fig.width=9, fig.height=6}
+
+his_cols <- c("PERSON_TYPE","PERSON_INJURY","EJECTION","EMOTIONAL_STATUS","BODILY_INJURY","POSITION_IN_VEHICLE","SAFETY_EQUIPMENT","COMPLAINT","PED_ROLE","PERSON_SEX")
+for (x in his_cols) {
+  plot(plot_fun(person, x))
+}
+
+```
+       
+**Findings** regarding these histograms:       
+* Missing/Unknown/Unspecified/DoesNotApply values that are still existing in some columns, which could cause bias if removed without further analysis and consideration.    
+* About some columns:    
+  - PERSON_TYPE: Occupant includes Driver, Passenger, Other, blank values, In-Line Skater.   
+  - PERSON_INJURY: 79% data are Unspecified, could be uninjured person.    
+  - POSITION_IN_VEHICLE: Driver is much more involved in accidents; front passenger is more involved than left rear or right rear passengers.     
+  - SAFETY_EQUIPMENT: has several similar values, for example, “Lap Belt & Harness”, “Lap Belt”, “Harness”, “Lap Belt/Harness”, that could be integrated for future easier modeling.  
+  - PED_ROLE: drivers and passengers are more involved in accidents.  
+  - PERSON_SEX: Male has almost twice the probability of involved in accidents as female.  
+    
+**Discussion**:  
+* There might also be a correlation between PED_ROLE, PERSON_TYPE and POSITION_IN_VEHICLE. Check multicollinearity if used as independent variables for future modeling.  
+* Since in BODILY_INJURY, EMOTIONAL_STATUS & COMPLAINT, top 2 values are "Does Not Apply" & blank; in EJECTION, top 2 values are "Not Ejected" & blank; most of other values are close to 0. Also, these are the variables that happened after the accidents, so they won't be used as independent variables in future modeling.  
+* Consider using SAFETY_EQUIPMENT, PERSON_SEX and one of PERSON_TYPE, POSITION_IN_VEHICLE & PED_ROLE as independent variables, PERSON_INJURY as dependent variable for logistic regression modeling.   
+      
+     
+#### Histogram for PERSON_AGE. 
+Age ranges from -999 to 9999, had to filter to 0-110.   
+Reasons about certain bound selection:  
+* Individuals can apply for a learner's permit at the age of 16 in New York.  
+* SSA defines individuals aged 65 years and above as eligible for full retirement benefits.  
+* 109-year-old Layne Hall was the oldest driver in US.  
+```{r}
+
+bin_ranges <- c(0, 16, 25, 35, 45, 55, 65, 110)
+age <- person %>%
+  select(PERSON_AGE) %>%
+  filter(PERSON_AGE >= 0 & PERSON_AGE < 110) %>%  
+  mutate(bin = cut(PERSON_AGE, breaks=bin_ranges, include.lowest=TRUE, right=FALSE)) %>%
+  group_by(bin) %>%
+  summarise(count = n()) %>%
+  mutate(percentage = round(count / sum(count) * 100, 2)) %>%
+  na.omit()
+
+ggplot(age, aes(x = bin, y = percentage)) +
+  geom_bar(stat = "identity", fill = "lightblue", color = "black") +
+  labs(x = "Age", y = "Percentage") +
+  ggtitle("PERSON_AGE") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(face = "bold")) +
+  geom_text(aes(label=paste0(percentage, "%"), vjust = -0.5))
+
+```
+      
+**Findings** regarding this histogram:     
+* Accident Percentage vs. Age group seems like a normal distribution, with [25-35) ranks the highest percentage of age groups involved in vehicle accidents. 
+        
+**Discussion**:       
+* Consider PERSON_AGE as another independent variable for logistic regression modeling.
+
+## Modeling  
+
+### Data Preparing    
+Made some modification to values in certain columns, and filter data for modeling. 
+```{r}
+
+# create dataframe for modeling.
+model_df <- person %>%
+  select(UNIQUE_ID, PERSON_TYPE, PERSON_AGE, POSITION_IN_VEHICLE, SAFETY_EQUIPMENT, PED_ROLE, PERSON_SEX, PERSON_INJURY) %>%
+  filter(PERSON_AGE >= 0 & PERSON_AGE < 110) %>%
+  filter(PERSON_SEX == "F" | PERSON_SEX == "M") %>%
+  #mutate(PERSON_INJURY = case_when(
+    #grepl("Injured|Killed", PERSON_INJURY) ~ "Injured/Killed",
+    #TRUE ~ PERSON_INJURY)) %>%
+  mutate(SAFETY_EQUIPMENT = case_when(
+    grepl("Helmet", SAFETY_EQUIPMENT) ~ "Helmet Only",
+    grepl("Air Bag Deployed", SAFETY_EQUIPMENT) ~ "Air Bag Deployed",
+    grepl("Lap Belt|Harness", SAFETY_EQUIPMENT) ~ "Lap Belt/Harness",
+    grepl("Stoppers Only", SAFETY_EQUIPMENT) ~ "Stoppers Only",
+    grepl("Pads Only", SAFETY_EQUIPMENT) ~ "Pads Only",
+    TRUE ~ SAFETY_EQUIPMENT)) %>%
+  filter(!(SAFETY_EQUIPMENT %in% c("", "Unknown", "-", "Other"))) %>%
+  mutate(POSITION_IN_VEHICLE = case_when(
+    grepl("Front passenger", POSITION_IN_VEHICLE) ~ "Front passenger", 
+    grepl("Right rear passenger", POSITION_IN_VEHICLE) ~ "RightRear/Sidecar passenger", 
+    grepl("Left rear passenger", POSITION_IN_VEHICLE) ~ "LeftRear/Rear passenger", 
+    grepl("Middle front", POSITION_IN_VEHICLE) ~ "MiddleFront/Lying passenger",
+    grepl("Middle rear", POSITION_IN_VEHICLE) ~ "MiddleRear/Lying passenger",
+    grepl("Any person in the rear", POSITION_IN_VEHICLE) ~ "Wagon/Truck/Bus passenger", 
+    grepl("seated on another", POSITION_IN_VEHICLE) ~ "Lap passenger",
+    TRUE ~ POSITION_IN_VEHICLE)) %>%
+  filter(!(POSITION_IN_VEHICLE %in% c("", "Unknown"))) %>%
+  mutate_at(vars(-UNIQUE_ID, -PERSON_AGE), factor) #%>%
+  #mutate(PERSON_INJURY = ifelse(PERSON_INJURY=="Injured/Killed",1,0))
+
+```
+   
+### Modeling    
+Create two datasets for modeling, model1 uses all data in model_df, model2 removes PERSON_INJURY == "Unspecified" from model_df.     
+
+#### Model 1:   
+PERSON_INJURY == "Injured" | "Killed" as 1, PERSON_INJURY == "Unspecified" as 0.  
+In this model, assume all Unspecified values are uninjured/unkilled people.  
+```{r}
+
+# dataframe for model1.
+model_df1 <- model_df %>%
+  mutate(PERSON_INJURY = case_when(
+    grepl("Injured|Killed", PERSON_INJURY) ~ "Injured/Killed",
+    TRUE ~ PERSON_INJURY)) %>%
+  mutate(INJURED_KILLED = ifelse(PERSON_INJURY=="Injured/Killed",1,0))
+glimpse(model_df1)
+
+```
+
+**Split** the dataframe into 70% training set and 30% test set. 
+```{r}
+
+set.seed(123)
+train_indices <- createDataPartition(model_df1$UNIQUE_ID, p = 0.7, list = FALSE)
+train1 <- model_df1[train_indices, ]
+test1 <- model_df1[-train_indices, ]
+
+```
+
+Create **logistic model** using training set. 
+```{r}
+
+model1 <- glm(INJURED_KILLED ~ PERSON_AGE+SAFETY_EQUIPMENT+PED_ROLE+PERSON_SEX+PERSON_TYPE+ POSITION_IN_VEHICLE, data=train1, family="binomial")
+# vif(model1)
+# Error in vif.default(model1) : 
+#  there are aliased coefficients in the model
+```
+
+As expected, there's high multicollinearity in the model, probably due to the existing of all three columns PED_ROLE, PERSON_TYPE & POSITION_IN_VEHICLE. Use only PED_ROLE to model again.
+```{r}
+
+model1 <- glm(INJURED_KILLED ~ PERSON_AGE+SAFETY_EQUIPMENT+PED_ROLE+PERSON_SEX, data=train1, family="binomial")
+vif(model1)
+
+```
+```{r}
+
+summary(model1)
+
+```
+
+All independent variables are statistically significant.   
+
+Make **prediction** using test set.
+```{r}
+
+test1$prob <- predict(model1, test1, type="response")
+summary(test1$prob)
+test1$pred <- ifelse(test1$prob >= 0.13, 1, 0)  # average pred value is 0.13308.
+head(test1)
+
+```
+
+**Evaluate** model1 using confusion matrix and ROC Curve. 
+```{r}
+
+# confusion matrix. 
+confusionMatrix(as.factor(test1$pred), as.factor(test1$INJURED_KILLED), positive="1")
+
+```
+
+```{r}
+
+# ROC Curve
+pred <- prediction(test1$prob, test1$INJURED_KILLED) # create a prediction object in R
+perf <- performance(pred, "tpr", "fpr") # tpr and fpr are true and false positive rates
+plot(perf, colorize=T)
+
+# calculate Area Under the Curve for this Logit Model
+auc.perf <-  performance(pred, measure = "auc")
+auc.perf <- auc.perf@y.values[[1]]
+print(paste("AUC value for logistic regression: ", round(auc.perf, 6)))
+
+```
+
+#### Model 2:
+PERSON_INJURY == "Killed" as 1, PERSON_INJURY == "Injured" as 0, drop "Unspecified".
+```{r}
+
+model_df2 <- model_df %>%
+  filter(PERSON_INJURY == "Injured" | PERSON_INJURY == "Killed") %>%
+  mutate(KILLED = ifelse(PERSON_INJURY=="Killed",1,0))
+
+model_df2_injured <- model_df2 %>% filter(PERSON_INJURY == "Injured")
+model_df2_killed <- model_df2 %>% filter(PERSON_INJURY == "Killed")
+glimpse(model_df2_injured)
+glimpse(model_df2_killed)
+
+```
+
+**Comparison** between certain columns.
+```{r}
+
+comp_plot_fun <- function(df1, df2, x, legend_labels) {
+  # Combine the dataframes
+  combined_df <- rbind(transform(df1, dataset = "df1"), transform(df2, dataset = "df2"))
+  
+  # Create a dataframe for the column with unique value counts
+  x_count <- combined_df %>%
+    group_by(dataset) %>%
+    count(dataset, !!sym(x)) %>%
+    mutate(Percentage = round(n / sum(n) * 100, 2))
+  
+  # Filter out bars with percentage less than 1%
+  x_count_filtered <- x_count %>%
+    filter(Percentage >= 2)
+  
+  # Bar plot
+  ggplot(x_count_filtered, aes(x = str_wrap(!!sym(x), width = 40), y = Percentage, fill = dataset)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(x = "Value", y = "Percentage", fill = "Dataset") +
+    scale_fill_manual(values = c("df1" = "#B1CCE4", "df2" = "#FFB9A1"), name = "Dataset",
+                      labels = legend_labels) +
+    theme_minimal() +
+    scale_x_discrete(labels = function(x) str_wrap(x, width = 40)) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, face = "bold"),
+          legend.position = "bottom",
+          text = element_text(size = 10, color = "black")) +
+    geom_text(aes(label = paste0(Percentage, "%"), y = Percentage, vjust = 0),
+              position = position_dodge(width = 0.9), fontface = "bold", hjust = 0.5) +
+    ggtitle(x)
+}
+
+```
+
+```{r, fig.width=9, fig.height=6}
+
+comp_cols <- c("SAFETY_EQUIPMENT","PED_ROLE","PERSON_SEX")
+for (x in comp_cols) {
+  plot(comp_plot_fun(model_df2_injured, model_df2_killed, x, c("Injured", "Killed")))
+}
+
+```
+
+**Compare** PERSON_AGE column:
+```{r}
+
+plot_age <- function(df, title) {
+  bin_ranges <- c(0, 16, 25, 35, 45, 55, 65, 110)
+age <- df %>%
+  select(PERSON_AGE) %>%
+  filter(PERSON_AGE >= 0 & PERSON_AGE < 110) %>%  
+  mutate(bin = cut(PERSON_AGE, breaks=bin_ranges, include.lowest=TRUE, right=FALSE)) %>%
+  group_by(bin) %>%
+  summarise(count = n()) %>%
+  mutate(percentage = round(count / sum(count) * 100, 2)) %>%
+  na.omit()
+
+ggplot(age, aes(x = bin, y = percentage)) +
+  geom_bar(stat = "identity", fill = "lightblue", color = "black") +
+  labs(x = "Age", y = "Percentage") +
+  ggtitle("PERSON_AGE") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(face = "bold")) +
+  geom_text(aes(label=paste0(percentage, "%"), vjust = -0.5)) +
+  labs(title=title)
+}
+
+```
+
+```{r}
+
+plot_age(model_df2_injured, "Injured")
+plot_age(model_df2_killed, "Killed")
+
+```
+
+**Comparing between Injured and Killed**, there are several differences between them:     
+* SAFETY_EQUIPMENT: numbers of Lap Belt/Harness dropped from 73% to 17%; people not wearing any safety equipment jumped from 15% to 40%; Air Bag Deployed indicates the accident is probably severe, thus contributes to mortality; Helmet Only means there's In-Line Skater/Bicyclist or Motorcycle involved, who's in vulnerable position in vehicle accidents. Overall, SAFETY_EQUIPMENT plays a big role between live and death.    
+* PED_ROLE: driver's percentage is even higher in Killed than Injured.    
+* PERSON_SEX: male is at a even higher percentage in Killed than Injured.    
+* PERSON_AGE: age group [25-35) ranks the highest percentage in both Injured and Killed. 
+
+
+**Split** the dataframe into 70% training set and 30% test set.   
+Since model_df2_killed data volume is really small compared to model_df2_injured, split them separately then merge together respectively to make sure they are distributed evenly into training and test set.   
+```{r}
+
+set.seed(123)
+
+injured_indices <- createDataPartition(model_df2_injured$UNIQUE_ID, p = 0.7, list = FALSE)
+train_injured <- model_df2_injured[injured_indices, ]
+test_injured <- model_df2_injured[-injured_indices, ]
+
+killed_indices <- createDataPartition(model_df2_killed$UNIQUE_ID, p = 0.7, list = FALSE)
+train_killed <- model_df2_killed[killed_indices, ]
+test_killed <- model_df2_killed[-killed_indices, ]
+
+train2 <- train_injured %>%
+  bind_rows(train_killed) %>%
+  mutate(KILLED = ifelse(PERSON_INJURY=="Killed",1,0))
+test2 <- test_injured %>%
+  bind_rows(test_killed) %>%
+  mutate(KILLED = ifelse(PERSON_INJURY=="Killed",1,0)) 
+train2 %>% group_by(KILLED) %>% summarise(n=n()) %>% mutate(percentage=n/sum(n))
+test2 %>% group_by(KILLED) %>% summarise(n=n()) %>% mutate(percentage=n/sum(n))
+
+```
+  
+KILLED==1 is evenly distributed into training and test set, but the percentage is really low, only about 0.3%, which will cause "fitted probabilities numerically 0 or 1 occurred" as shown below. 
+  
+Create **logistic model** using training set. 
+```{r}
+
+model2 <- glm(KILLED ~ PERSON_AGE+SAFETY_EQUIPMENT+PED_ROLE+PERSON_SEX, data=train2, family="binomial")
+summary(model2)
+
+```
+  
+Now PED_ROLE isn't statistically significant anymore. Remove it and create model again.
+```{r}
+
+model2 <- glm(KILLED ~ PERSON_AGE + SAFETY_EQUIPMENT + PERSON_SEX, data=train2, family="binomial")
+summary(model2)
+
+```
+
+Note: Stoppers Only & Pads Only are for only In-Line Skater/Bicyclist, which only account for less than 0.1% of data. 
+
+Make **prediction** using test set.
+```{r}
+
+test2$prob <- predict(model2, test2, type="response")
+summary(test2$prob)
+test2$pred <- ifelse(test2$prob >= 0.0028, 1, 0)  # average pred value is 0.002826.
+head(test2)
+
+```
+
+**Evaluate**  using confusion matrix and ROC Curve.  
+```{r}
+
+# confusion matrix. 
+confusionMatrix(as.factor(test2$pred), as.factor(test2$KILLED), positive="1")
+
+```
+
+```{r}
+
+# ROC Curve
+pred <- prediction(test2$prob, test2$KILLED) # create a prediction object in R
+perf <- performance(pred, "tpr", "fpr") # tpr and fpr are true and false positive rates
+plot(perf, colorize=T)
+
+# calculate Area Under the Curve for this Logit Model
+auc.perf <-  performance(pred, measure = "auc")
+auc.perf <- auc.perf@y.values[[1]]
+print(paste("AUC value for logistic regression: ", round(auc.perf, 6)))
+
+```
+
+Model2 shows the evidence that SAFETY_EQUIPMENT did play a big role between live and death in vehicle accidents; Age and Sex also have some influence on the results. 
