@@ -17,8 +17,6 @@ Final: https://www.youtube.com/watch?v=L_AgN_qxl_s
 
 ## R code Running Instruction
 Please be patient, due to sizes of csv files, it will take a few minutes to load data, clean data and running other R code commands.    
-  
-#### Person 
 Use **raw data** to clean rows then use 50% threshold to clean columns. Please be patient, it will take a few minutes to load data and clean data. 
 For detailed running instructions, please follow markdowns in **"NYC Vehicle Accident Investigation - Person.Rmd"** file. For a results report including visualizations without running code, check out **"NYC-Vehicle-Accident-Investigation---Person.pdf"**.  
   
