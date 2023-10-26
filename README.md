@@ -7,10 +7,6 @@ Motor_vehicle_Collisions - Person: https://catalog.data.gov/dataset/motor-vehicl
 Original csv files were downloaded 6/15/2023 through above websites, and data sizes as shown.    
 However, DATA.GOV updates the above data regualarly, so if use newly downloaded csv files, R code results might be a little different from group's final report.     
 
-But for convenience, **Column cleaned** data can also be download through Dropbox:     
-Person: https://www.dropbox.com/s/eqy8j0o3kr097v4/20230616_person_clean_50.csv?dl=0    998 Mb    
-Some R code might run from column cleaned data. Please check R code to make sure.     
-
 ## Presentation video
 Proposal: https://www.youtube.com/watch?v=bp6K5hLZpYc    
 Final: https://www.youtube.com/watch?v=L_AgN_qxl_s
