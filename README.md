@@ -1,5 +1,7 @@
 # NYC Vehicle Accident Investigation - Person
-This was the Team 41's group project for Georgia Tech MGT 6203 Summer of 2023 semester, but this repository only kept the Person dataset analysis, which is my own part of analysis in this project. Other parts, including Crash and Vehicle analysis were mainly done by other team members, and aren't included here. 
+This was part of the Team 41's group project for Georgia Tech MGT 6203 Summer of 2023 semester.   
+This repository only kept the Person dataset analysis, which is my own part of analysis in this project.   
+Other parts, including Crash and Vehicle analysis were mainly done by other team members, and aren't included here. 
 
 ## Data Download Instruction    
 If **raw data** downloading is needed for R code, please download from the following websites.     
