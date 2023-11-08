@@ -5,7 +5,7 @@ Other parts, including Crash and Vehicle analysis were mainly done by other team
 
 ## Introduction
 This project was trying to find the contributing factor for person's injury/death in vehicle accidents, then build a logistic regression model to make prediction. Confusion Matrix and ROC Curve were used to evaluate the model.  
-Please check detail in **"Person dataset analysis.pdf"**. 
+Please check details in **"Person dataset analysis.pdf"**. 
 
 Evidence from Person dataset indicates:   
 1) Use of safety equipment significantly contributes to the difference between life and death.   
