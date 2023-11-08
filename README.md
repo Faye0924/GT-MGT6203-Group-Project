@@ -4,13 +4,15 @@ This repository only kept the Person dataset analysis, which is my own part of a
 Other parts, including Crash and Vehicle analysis were mainly done by other team members, and aren't included here. 
 
 ## Introduction
-This project was trying to find the contributing factor for person's injury/death in vehicle accidents, then build a logistic regression model to make prediction. Confusion Matrix and ROC Curve were used to evaluate the model.   
+This project was trying to find the contributing factor for person's injury/death in vehicle accidents, then build a logistic regression model to make prediction. Confusion Matrix and ROC Curve were used to evaluate the model.  
+Please check detail in **"Person dataset analysis.pdf"**. 
 
 Evidence from Person dataset indicates:   
 1) Use of safety equipment significantly contributes to the difference between life and death.   
    Companies can leverage the importance of safety equipment in their advertising by emphasizing how their products or services prioritize customer safety.  
 2) Higher involvement of male drivers in accidents.  
-   Government and transportation authorities could utilize result to encourage male drivers to adopt more cautious driving behaviors.
+   Government and transportation authorities could utilize result to encourage male drivers to adopt more cautious driving behaviors.  
+3) Age group [25-35) ranks the highest percentage in both injured and killed in vehicle accidents.
 
 ## Data Download Instruction    
 If **raw data** downloading is needed for R code, please download from the following websites.     
